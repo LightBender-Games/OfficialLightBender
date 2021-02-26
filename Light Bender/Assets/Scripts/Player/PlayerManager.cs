@@ -26,8 +26,9 @@ public class PlayerManager : MonoBehaviour
     }
 
     void CreateController() // cree l objet joueur
-    { 
+    {
         Transform spawnpoint = SpawnManager.Instance.GetSpawnpoint(team);
+        Debug.Log($"Team number {team} is being instantiated");
         controller = PhotonNetwork.Instantiate(Path.Combine("PhotonPrefabs", "PlayerController"),spawnpoint.position,spawnpoint.rotation,0,new object[] { Phv.ViewID });
     }
 

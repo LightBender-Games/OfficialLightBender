@@ -22,7 +22,6 @@
       <Path>Light Bender_Data</Path>
       <Path>Logs</Path>
       <Path>MonoBleedingEdge</Path>
-      <Path>Temp</Path>
       <Path>obj</Path>
     </explicitExcludes>
   </component>
