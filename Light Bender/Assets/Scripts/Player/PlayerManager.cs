@@ -9,6 +9,8 @@ public class PlayerManager : MonoBehaviour
 
      GameObject controller;
 
+     int team;
+
     void Awake()
     {
         Phv = GetComponent<PhotonView>();
@@ -23,18 +25,30 @@ public class PlayerManager : MonoBehaviour
         }
     }
 
-    void CreateController() // gestion des mouvements du joueur
+    void CreateController() // cree l objet joueur
     { 
-        Transform spawnpoint = SpawnManager.Instance.GetSpawnpoint();
+        Transform spawnpoint = SpawnManager.Instance.GetSpawnpoint(team);
         controller = PhotonNetwork.Instantiate(Path.Combine("PhotonPrefabs", "PlayerController"),spawnpoint.position,spawnpoint.rotation,0,new object[] { Phv.ViewID });
     }
 
     public void Die()
     {
         PhotonNetwork.Destroy(controller);
+        // might add a little delay before respawn
         CreateController();
     }
-    
-    
+
+    public void SetTeam(int Team)
+    {
+        if (Team == 0 || Team == 1)
+        {
+            team = Team;
+        }
+        else
+        {
+            Debug.Log("PLayerManager: Team number is not valid");
+        }
+        
+    }
     
 }
