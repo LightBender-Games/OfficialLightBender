@@ -5,7 +5,7 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
-public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
+public class PlayerController : MonoBehaviourPunCallbacks
 {
     [SerializeField] GameObject cameraHolder;
     
@@ -15,8 +15,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
 
      int itemIndex;
      int previousItemIndex = -1;
-    
-
+     
     float verticalLookRotation;
     bool grounded;
     Vector3 smoothMoveVelocity;
@@ -26,8 +25,8 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
 
     PhotonView Phv;
 
-    const float maxHealth = 100f;
-    float currentHealth = maxHealth;
+   /* const float maxHealth = 100f;
+    float currentHealth = maxHealth;*/
 
     PlayerManager playerManager;
 
@@ -35,7 +34,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     {
         rb = GetComponent<Rigidbody>();
         Phv = GetComponent<PhotonView>();
-        playerManager = PhotonView.Find((int)Phv.InstantiationData[0]).GetComponent<PlayerManager>();
+        //playerManager = PhotonView.Find((int)Phv.InstantiationData[0]).GetComponent<PlayerManager>();
     }
 
     void Start()
@@ -93,15 +92,15 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
            
         }
 
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButton(0))
         {
             items[itemIndex].Use();
         }
 
-        if (transform.position.y < -10f)
+        /*if (transform.position.y < -10f)
         {
             Die();
-        }
+        }*/
     }
 
     void Move()
@@ -166,7 +165,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         grounded = _grounded; 
     }
 
-    private void FixedUpdate()
+     void FixedUpdate()
     {
         if (!Phv.IsMine)
             return;
@@ -174,7 +173,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         rb.MovePosition(rb.position + transform.TransformDirection(moveAmount) * Time.fixedDeltaTime);
     }
 
-    public void TakeDamage(float damage) // juste sur le shooter
+   /* public void TakeDamage(float damage) // juste sur le shooter
     {
         Phv.RPC("RPC_TakeDamage", RpcTarget.All,damage);
     }
@@ -193,5 +192,5 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     void Die()
     {
         playerManager.Die();
-    }
+    }*/
 }

@@ -14,11 +14,11 @@ public class Launcher : MonoBehaviourPunCallbacks
     [SerializeField]  TMP_InputField roomNameInputField;
     [SerializeField] TMP_Text errorText;
     [SerializeField] TMP_Text RoomNameText;
-    [SerializeField] Transform roomListContent;
+    [SerializeField]  Transform roomListContent;
     [SerializeField] GameObject roomListItemPrefab;
     [SerializeField] Transform playerListContent;
     [SerializeField] GameObject PlayerListItemPrefab;
-    [SerializeField]  GameObject StartGamebutton;
+    [SerializeField] GameObject StartGamebutton;
 
     private void Awake()
     {
@@ -57,29 +57,30 @@ public class Launcher : MonoBehaviourPunCallbacks
         MenuManager.Instance.OpenMenu("Loading");
     }
 
-    public override void OnJoinedRoom()
-    {
-        MenuManager.Instance.OpenMenu("room");
-        RoomNameText.text = PhotonNetwork.CurrentRoom.Name; // donne le nom de la room actuelle avec celle tape precedemment
-
-        Player[] players = PhotonNetwork.PlayerList; // liste des joueurs
-
-        foreach (Transform child in playerListContent)
-        {
-            Destroy(child.gameObject);
-            for (int i = 0; i < players.Length; i++)
-            {
-                Instantiate(PlayerListItemPrefab, playerListContent).GetComponent<PlayerListItem>().Setup(players[i]); // setup des joueurs
-            }
-
-            StartGamebutton.SetActive(PhotonNetwork.IsMasterClient); // instancie le bouton start uniquement pour le master du jeu
-        }
-    }
-
     public override void OnMasterClientSwitched(Player newMasterClient)
     {
         StartGamebutton.SetActive(PhotonNetwork.IsMasterClient); // switch de master quand le precedent est parti
     }
+    public override void OnJoinedRoom()
+    {
+        MenuManager.Instance.OpenMenu("room");
+        RoomNameText.text = PhotonNetwork.CurrentRoom.Name; // donne le nom de la room actuelle avec celle tape precedemment
+        
+        Player[] players = PhotonNetwork.PlayerList; // liste des joueurs
+
+        foreach(Transform child in playerListContent)
+        {
+            Destroy(child.gameObject);
+        }
+        for(int i = 0; i < players.Length; i++)
+        {
+            Instantiate(PlayerListItemPrefab, playerListContent).GetComponent<PlayerListItem>().Setup(players[i]);
+        }
+
+        StartGamebutton.SetActive(PhotonNetwork.IsMasterClient);
+    }
+
+    
 
     public override void OnCreateRoomFailed(short returnCode,string message)
     {
@@ -102,7 +103,6 @@ public class Launcher : MonoBehaviourPunCallbacks
     {
         PhotonNetwork.JoinRoom(info.Name);
         MenuManager.Instance.OpenMenu("loading");
-        
     }
 
     public override void OnLeftRoom()
@@ -116,7 +116,7 @@ public class Launcher : MonoBehaviourPunCallbacks
         {
             Destroy(trans.gameObject); // clear la liste a chaque fois qu'on update
         }
-        
+
         for (int i = 0; i < roomList.Count; i++) // quand tu quittes la room on enleve le joueur
         {
             if (roomList[i].RemovedFromList)
@@ -128,5 +128,24 @@ public class Launcher : MonoBehaviourPunCallbacks
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         Instantiate(PlayerListItemPrefab,playerListContent).GetComponent<PlayerListItem>().Setup(newPlayer); // instancie un  nouveau player
+    }
+
+
+    public void JoinTeam(int team)
+    {
+
+        if (PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey("Team"))
+        {
+
+            PhotonNetwork.LocalPlayer.CustomProperties["Team"] = team;
+        }
+        else
+        {
+            ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
+            {
+                {"Team", team}
+            };
+            PhotonNetwork.SetPlayerCustomProperties(playerProps);
+        }
     }
 }
