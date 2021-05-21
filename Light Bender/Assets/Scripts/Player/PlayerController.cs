@@ -24,13 +24,15 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
 
     int itemIndex;
     int previousItemIndex = -1;
+
+    int oresHolded;
+    public bool hasOre => oresHolded != 0;
      
     float verticalLookRotation;
     bool grounded;
-    bool HasOre;
     Vector3 smoothMoveVelocity;
     Vector3 moveAmount;
-    
+
     Rigidbody rb;
 
     PhotonView Phv;
@@ -46,7 +48,7 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
     public TextMeshProUGUI redScoreText;
     
     Renderer[] visuals;
-    int team = 0;
+    int team;
     public const float maxHealth = 100f;
     public float currentHealth = maxHealth;
 
@@ -74,8 +76,8 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
             if (items[itemIndex] is SingleShot)
             {
                 singleshot = (SingleShot) items[itemIndex];
-                Debug.Log("Name " + items[itemIndex].name);
-                Debug.Log(singleshot.nbballes + " :::: " + singleshot.nbinit);
+                //Debug.Log("Name " + items[itemIndex].name);
+                //Debug.Log(singleshot.nbballes + " :::: " + singleshot.nbinit);
             }
             
             visuals = GetComponentsInChildren<Renderer>();
@@ -91,9 +93,9 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
     
     void Update()
     {
-        if (!Phv.IsMine)
+        if (!Phv.IsMine || PauseMenu.GameIsPaused)
             return;
-        
+
         Look();
         Move();
         Jump();
@@ -295,16 +297,19 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
         grounded = _grounded; 
     }
     
-    public void SetHasOre(bool _hasOre)
+    public void AddOre(int oresToAdd)
     {
-        HasOre = _hasOre;
+        oresHolded += oresToAdd;
     }
-
-    public bool GetHasOre()
+    public int GetOresHolded()
     {
-        return HasOre;
+        return oresHolded;
     }
-
+    public void RemoveOres()
+    {
+        oresHolded = 0;
+    }
+    
     public void SetTeam(int team)
     {
         this.team = team;
@@ -317,7 +322,7 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
 
      void FixedUpdate()
     {
-        if (!Phv.IsMine)
+        if (!Phv.IsMine || PauseMenu.GameIsPaused)
             return;
         
         rb.MovePosition(rb.position + transform.TransformDirection(moveAmount) * Time.fixedDeltaTime);
@@ -334,10 +339,10 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
          currentHealth = 100;
          PlayerManager.scores[(team+1)%2] += 1;
          PlayerManager.UpdateScores();
-         if (GetHasOre())
+         if (oresHolded != 0)
          {
-             Debug.Log(name+" died and lost the ore.");
-             SetHasOre(false);
+             Debug.Log(name+" died and lost the ores he was holding.");
+             RemoveOres();
          }
          
          _progressBarPro.SetValue(100f,100f);
