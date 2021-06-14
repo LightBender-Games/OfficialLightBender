@@ -1,27 +1,22 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.SceneManagement;
-using Photon.Pun;
-using Photon.Realtime;
-using Photon.Pun.UtilityScripts;
-using UnityEngine.UI;
+﻿using System.Collections.Generic;
 using System.IO;
+using Photon.Pun;
+using UnityEngine;
 using Random = System.Random;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
     public GameObject redPlayerPrefab;
     public GameObject bluePlayerPrefab;
-    
+
     public GameObject RedBot;
     public GameObject BlueBot;
 
     int RS;
     int BS;
-    
+
     public static GameManager instance;
-    
+
     public static Random rand = new Random();
     [SerializeField] GameObject map;
 
@@ -29,13 +24,17 @@ public class GameManager : MonoBehaviourPunCallbacks
     [SerializeField] int redbots;
     [SerializeField] int bluebots;
 
-    
-    
+    public static int BlueLayer;
+    public static int RedLayer;
 
-    
-  private void Start()
+    public bool isFocused;
 
+    public static List<ChatMessage> chatMessages = new List<ChatMessage>();
+
+    private void Start()
     {
+        BlueLayer = LayerMask.NameToLayer("BlueL");
+        RedLayer = LayerMask.NameToLayer("RedL");
         //check that we dont have a local instance before we instantiate the prefab
         if (PlayerManager.localPlayerInstance == null)
         {
@@ -43,9 +42,9 @@ public class GameManager : MonoBehaviourPunCallbacks
             {
                 int redbotsCount = redbots;
                 int bluebotsCount = bluebots;
-                foreach (var players in PhotonNetwork.PlayerList)
+                foreach (var currentPlayer in PhotonNetwork.PlayerList)
                 {
-                    if ((int) players.CustomProperties["Team"] == 0)
+                    if ((int) currentPlayer.CustomProperties["Team"] == 0)
                     {
                         bluebotsCount--;
                     }
@@ -59,10 +58,10 @@ public class GameManager : MonoBehaviourPunCallbacks
                 {
                     //get a spawn for the correct team
                     Transform spawn = SpawnManager.instance.blueTeamSpawns[BS].transform;
-                    PhotonNetwork.Instantiate(Path.Combine("PhotonPrefabs", BlueBot.name), spawn.position, spawn.rotation);
+                    GameObject bot = PhotonNetwork.Instantiate(Path.Combine("PhotonPrefabs", BlueBot.name), spawn.position, spawn.rotation);
                     BS++;
                 }
-             
+         
                 for (int i = redbotsCount; i > 0; i--)
                 {
                     //get a spawn for the correct team
@@ -70,9 +69,9 @@ public class GameManager : MonoBehaviourPunCallbacks
                     PhotonNetwork.Instantiate(Path.Combine("PhotonPrefabs", RedBot.name), spawn.position, spawn.rotation);
                     RS++;
                 }
-            
+        
             }
-            
+        
             //instantiate the correct player based on the team
             int team = (int) PhotonNetwork.LocalPlayer.CustomProperties["Team"];
             Debug.Log($"Team number {team} is being instantiated");
@@ -92,11 +91,17 @@ public class GameManager : MonoBehaviourPunCallbacks
                 player = PhotonNetwork.Instantiate(Path.Combine("PhotonPrefabs", redPlayerPrefab.name), spawn.position, spawn.rotation);
                 RS++;
             }
-
+        
             PlayerController playerController = player.GetComponent<PlayerController>();
             playerController.SetTeam(team);
+            playerController.isLocal = true;
+        
+            // SET UP CHAT
+            Chat chat = player.AddComponent<Chat>();
+            playerController.chat = chat;
+            playerController.chat.playerController = playerController;
+            
             PlayerManager.players.Add(playerController);
-
         }
 
     }
@@ -111,19 +116,31 @@ public class GameManager : MonoBehaviourPunCallbacks
         // gets components in children is recursive, so it will give us
         // the renderers of the walls, the floors, ...
 
-        for (int i = 0; i < renderers.Length; i++)
+        foreach (var render in renderers)
         {
             //renderers[i].material = material;
-            renderers[i].material.color = Color.green;
+            render.material = material;
         }
+
         // change all renderers' material
     }
     public void ChangeColorOfMap(Color color)
     {
-        Renderer[] renderers = map.GetComponentsInChildren<Renderer>();
-        for (int i = 0; i < renderers.Length; i++)
+        var renderers = map.GetComponentsInChildren<Renderer>();
+        foreach (var render in renderers)
         {
-            renderers[i].material.color = color;
+            render.material.color = color;
         }
     }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        isFocused = hasFocus;
+        // not sure if having a bool indicating if we're focused on the window
+        // serves any purpose, but it's there anyway.
+
+        AudioListener.pause = !isFocused;
+        // if focused, then no pause, and vice-versa
+    }
 }
+

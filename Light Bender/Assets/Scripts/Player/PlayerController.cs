@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections;
 using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
@@ -12,6 +10,8 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
     
     [SerializeField] float mouseSensivity, sprintSpeed, walkSpeed, jumpForce, smoothTime;
 
+    [SerializeField] float respawnTime;
+    
     [SerializeField]  Item[] items;
     
     [SerializeField] ProgressBarPro _progressBarPro;
@@ -27,6 +27,12 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
 
     int oresHolded;
     public bool hasOre => oresHolded != 0;
+
+    public bool IsLocal => isLocal;
+
+    public bool isLocal;
+
+    private bool canRespawn = true;
      
     float verticalLookRotation;
     bool grounded;
@@ -35,70 +41,101 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
 
     Rigidbody rb;
 
-    PhotonView Phv;
+    public PhotonView Phv;
 
     private Animator animator;
 
-    /* const float maxHealth = 100f;
-     float currentHealth = maxHealth;*/
-
     PlayerManager playerManager;
+    
+    public GameObject lastShooter;
     
     public TextMeshProUGUI blueScoreText;
     public TextMeshProUGUI redScoreText;
     
     Renderer[] visuals;
     int team;
-    public const float maxHealth = 100f;
+
+    public bool PlayerOnlyLook;
+
+    private const float maxHealth = 100f;
     public float currentHealth = maxHealth;
 
     private SingleShot singleshot;
 
-
-   
+    public Chat chat;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         Phv = GetComponent<PhotonView>();
         //playerManager = PhotonView.Find((int)Phv.InstantiationData[0]).GetComponent<PlayerManager>();
+
+        if (!PlayerManager.players.Contains(this))
+        {
+            PlayerManager.players.Add(this);
+        }
+        // playerController is instantiated on each machine in the room. 
+        // by doing this, it will locally, on each machine in the room 
+        // (PhotonNetwork.Instantiate() creates the object for all machines)
+        // add the object to the players. 
+        
+        // just have to test it out, but it SHOULD work
+        
+        
+        // DEBUG
+        /*Debug.Log("Displaying PlayerManager.players on machine of player "+name+":");
+        for (int i = 0; i < PlayerManager.players.Count; i++)
+        {
+            Debug.Log("PLayer Name:" + PlayerManager.players[i].name);
+        }*/
     }
 
     void Start()
     {
+        //Debug.Log("Starting");
         if (Phv.IsMine)
         {
+            //Debug.Log("Phv is mine");
             EquipItem(0);
             animator = GetComponent<Animator>();
             health.SetActive(true);
             munitionObject.SetActive(true);
+            PauseMenu.isleft = true;
             
             if (items[itemIndex] is SingleShot)
             {
                 singleshot = (SingleShot) items[itemIndex];
+                singleshot.PlayerOwner = this;
                 //Debug.Log("Name " + items[itemIndex].name);
                 //Debug.Log(singleshot.nbballes + " :::: " + singleshot.nbinit);
             }
             
             visuals = GetComponentsInChildren<Renderer>();
             team = (int)PhotonNetwork.LocalPlayer.CustomProperties["Team"];
+            Debug.Log("Instantiation is finished");
         }
         else
         {
+            Debug.Log("Destroy component");
+            Debug.Log("Owner name of phv: "+Phv.Owner.NickName);
             Destroy(GetComponentInChildren<Camera>().gameObject);
             Destroy(rb);
         }
-        
     }
     
     void Update()
     {
+        //Debug.Log(PauseMenu.GameIsPaused + "  <>  " + Phv.IsMine );
         if (!Phv.IsMine || PauseMenu.GameIsPaused)
             return;
-
+        
+        
         Look();
-        Move();
-        Jump();
+        if (!PlayerOnlyLook)
+        {
+            Move();
+            Jump();
+        }
 
         for (int i = 0; i < items.Length; i++)
         {
@@ -114,6 +151,7 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
             if (itemIndex >= items.Length - 1)
             {
                 EquipItem(0);
+                Debug.Log("Equip item");
             }
             else
             {
@@ -156,12 +194,13 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
 
         if (Input.GetKeyDown("r"))
         {
-            StartCoroutine(singleshot.Reload());
+            StartCoroutine(singleshot.Reload(singleshot.secondsToReload));
         }
     }
 
     void Move()
     {
+        //Debug.Log("Movement activated");
         Vector3 moveDir = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical")).normalized;
 
         moveAmount = Vector3.SmoothDamp(moveAmount, moveDir * (Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : walkSpeed),
@@ -180,11 +219,13 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
         
         bool isDance = animator.GetBool("IsDance");
         bool presseddance = Input.GetKey("l");;
+        //Debug.Log("Movement");
         
         // walk
         if (!isWalking && pressedwalk)
         {
             animator.SetBool("IsWalking",true);
+            //Debug.Log("Walking");
         }
         if (isWalking && !pressedwalk)
         {
@@ -278,8 +319,7 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
         
         if (Phv.IsMine)
         {
-            Hashtable hash = new Hashtable();
-            hash.Add("itemindex", itemIndex);
+            Hashtable hash = new Hashtable {{"itemindex", itemIndex}};
             PhotonNetwork.LocalPlayer.SetCustomProperties(hash);
         }
     }
@@ -292,16 +332,24 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
         }
     }
 
+    private void ResetAnimator()
+    {
+        animator.SetBool("isWalking",false);
+        animator.SetBool("IsRunning",false);
+        animator.SetBool("IsLeftWalk",false);
+        animator.SetBool("IsRightWalk",false);
+        animator.SetBool("IsDance",false);
+    }
+
     public void SetGroundedState(bool _grounded)
     {
         grounded = _grounded; 
     }
-    
     public void AddOre(int oresToAdd)
     {
         oresHolded += oresToAdd;
     }
-    public int GetOresHolded()
+    public int GetOresBeingHeld()
     {
         return oresHolded;
     }
@@ -309,22 +357,37 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
     {
         oresHolded = 0;
     }
-    
-    public void SetTeam(int team)
+    public bool GetOnlyLook()
     {
-        this.team = team;
+        return PlayerOnlyLook;
+    }
+    public void SetOnlyLook(bool onlyLook)
+    {
+        PlayerOnlyLook = onlyLook;
+        ResetAnimator();
+        rb.velocity = Vector3.zero;
+    }
+    
+    public void SetTeam(int Team)
+    {
+        team = Team;
     }
 
     public int GetTeam()
     {
         return team;
     }
-
-     void FixedUpdate()
+    
+    void FixedUpdate()
     {
-        if (!Phv.IsMine || PauseMenu.GameIsPaused)
+        if (PlayerOnlyLook)
+        {
+            rb.velocity = Vector3.zero;
+            // we do not want the player to move if the player stopped
+        }
+        if (!Phv.IsMine || PauseMenu.GameIsPaused || PlayerOnlyLook)
             return;
-        
+
         rb.MovePosition(rb.position + transform.TransformDirection(moveAmount) * Time.fixedDeltaTime);
     }
      
@@ -333,26 +396,41 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
          Phv.RPC("RPC_TakeDamage", RpcTarget.All,damage);
      }
     
-     IEnumerator Respawn()
+     IEnumerator Respawn(float respawnWait)
      {
+         canRespawn = false;
+         // overflow protection for respawn
+         
          SetRenderers(false);
+
          currentHealth = 100;
          PlayerManager.scores[(team+1)%2] += 1;
          PlayerManager.UpdateScores();
          if (oresHolded != 0)
          {
-             Debug.Log(name+" died and lost the ores he was holding.");
+             SendChatMessage("System",
+                 lastShooter.name +" killed " + name);
              RemoveOres();
          }
          
-         _progressBarPro.SetValue(100f,100f);
          GetComponent<PlayerController>().enabled = false;
          Transform spawn = SpawnManager.instance.GetTeamSpawn(team);
          transform.position = spawn.position;
          transform.rotation = spawn.rotation;
          GetComponent<PlayerController>().enabled = true;
-         yield return new WaitForSeconds(1);        
+         
+         SendChatMessage("System",
+             lastShooter.name +" killed " + name);
+         
+         yield return new WaitForSeconds(respawnWait);
+
+         currentHealth = 100; 
+         // just in case someone manages to shoot the player when waiting
+         
+         _progressBarPro.SetValue(100f,100f);
+
          SetRenderers(true);
+         canRespawn = true;
      }
 
      void SetRenderers(bool state)
@@ -362,7 +440,13 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
              renderer.enabled = state;
          }
      }
-    
+
+     public void SendChatMessage(string sender, string message)
+     {
+         Phv.RPC("SendChat",RpcTarget.All,sender,message);
+     }
+
+
      [PunRPC]
      void RPC_TakeDamage(float damage)
      {
@@ -371,62 +455,24 @@ public class PlayerController : MonoBehaviourPunCallbacks,IDamageable
 
          currentHealth -= damage;
          _progressBarPro.SetValue(currentHealth,100f);
-         if (currentHealth <= 0)
+         if (currentHealth <= 0 && canRespawn)
          {
-             StartCoroutine(Respawn());
+             StartCoroutine(Respawn(respawnTime));
          }
      }
+     
+     [PunRPC]
+     void SendChat(string sender, string message)
+     {
+         ChatMessage m = new ChatMessage(sender,message);
+
+         GameManager.chatMessages.Insert(0, m);
+         if(GameManager.chatMessages.Count > 8)
+         {
+             GameManager.chatMessages.RemoveAt(GameManager.chatMessages.Count - 1);
+         }
+
+         Chat.chatMessages = GameManager.chatMessages;
+         // responsible for the synchronisation of all messages
+     }
 }
-
-
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-     
-   /* public void TakeDamage(float damage) // juste sur le shooter
-    {
-        Phv.RPC("RPC_TakeDamage", RpcTarget.All,damage);
-    }
-
-    [PunRPC]
-    void RPC_TakeDamage(float damage) // execute sur tous les ordinateurs
-    {
-        if (!Phv.IsMine)
-            return;
-        currentHealth -= damage;
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
-    }
-    void Die()
-    {
-        playerManager.Die();
-    }*/
-

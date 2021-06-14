@@ -1,12 +1,13 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
+using EnemyAI;
 using Photon.Pun;
 using UnityEngine;
 
 public class SingleShot : GUN
 {
-   public float firerate = 15; 
-   [SerializeField] Camera cam;
+   public PlayerController PlayerOwner;
+   
+   public float firerate = 15;
    public LayerMask ignoreLayerMask;
    public Transform gunTransform;
 
@@ -61,9 +62,7 @@ public class SingleShot : GUN
    void RPC_Shoot()
    {
       Ray rayon = new Ray(gunTransform.position, gunTransform.forward);
-      if (nbballes <= 0)
-         return;
-      else
+      if (nbballes > 0)
       {
          if (Time.time >= nexttimetofire)
          {
@@ -84,8 +83,17 @@ public class SingleShot : GUN
                   Destroy(buletimpact, 2f);
                   buletimpact.transform.SetParent(bimp[0].transform);
                }
-
-               hit.collider.gameObject.GetComponent<IDamageable>()?.TakeDamage(((GunInfo) iteminfo).damage);
+               
+               IDamageable damageableOfCollider = hit.collider.gameObject.GetComponent<IDamageable>();
+               damageableOfCollider?.TakeDamage(((GunInfo) iteminfo).damage);
+               if (hit.collider.gameObject.GetComponent<PlayerController>() != null)
+               {
+                  hit.collider.gameObject.GetComponent<PlayerController>().lastShooter = PlayerOwner.gameObject;
+               }
+               else if (hit.collider.gameObject.GetComponent<AIController>() != null)
+               {
+                  hit.collider.gameObject.GetComponent<AIController>().lastShooter = PlayerOwner.gameObject;
+               }
 
                //Debug.Log(((GunInfo) iteminfo).damage + " DOMMAGES");
                if (hit.rigidbody != null)
