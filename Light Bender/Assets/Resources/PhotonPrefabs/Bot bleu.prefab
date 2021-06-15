@@ -1337,7 +1337,7 @@ MonoBehaviour:
   itemGameObject: {fileID: 4342431187123033574}
   bulletImpactPrefab: {fileID: 1723818010802918, guid: cf5aacd810ed5d044a1dc012538fa468,
     type: 3}
-  AiOwner: {fileID: 0}
+  AiOwner: {fileID: -5466342713023187849}
   firerate: 8
   ignoreLayerMask:
     serializedVersion: 2
@@ -1719,6 +1719,7 @@ MonoBehaviour:
   enemyTeam: RedS
   currentHealth: 100
   lastShooter: {fileID: 0}
+  respawnTime: 5
   items:
   - {fileID: 5262229306368699999}
   team: 0
