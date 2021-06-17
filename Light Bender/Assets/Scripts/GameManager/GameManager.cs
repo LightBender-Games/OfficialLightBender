@@ -44,7 +44,6 @@ public class GameManager : MonoBehaviourPunCallbacks
 
 
     public static List<ChatMessage> chatMessages = new List<ChatMessage>();
-    public  Dictionary<string, KeyCode> keys = new Dictionary<string, KeyCode>(); 
     
     private void Start()
     {
