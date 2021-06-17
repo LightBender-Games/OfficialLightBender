@@ -13,7 +13,7 @@ public class Chat : MonoBehaviour
     bool isChatting;
     string chatInput = "";
 
-    [SerializeField] int minHeightOnScreen = 75;
+    [SerializeField] int minHeightOnScreen = 90;
     [SerializeField] int maxLengthMessage = 60;
     [SerializeField] GUIStyle chatBoxStyle;
 
@@ -45,7 +45,7 @@ public class Chat : MonoBehaviour
         {
             playerController.PlayerOnlyLook = false;
         
-            GUI.Label(new Rect(5, Screen.height - minHeightOnScreen, 200, 25), "Press 'T' to chat");
+            GUI.Label(new Rect(5, Screen.height - minHeightOnScreen, 200, 25), "Press '"+GameManager.instance.keys["Chat"]+"' to chat");
         }
         else
         {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -11,12 +12,13 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     [SerializeField] GameObject cameraHolder;
     
     [SerializeField] CapsuleCollider capsuleCollider;
+    [SerializeField] SkinnedMeshRenderer playerRenderer;
     
     [SerializeField] float mouseSensivity, sprintSpeed, walkSpeed, jumpForce, smoothTime;
 
     [SerializeField] float respawnTime;
-    
-    [SerializeField]  Item[] items;
+
+    [SerializeField] List<Item> items;
     
     [SerializeField] ProgressBarPro _progressBarPro;
 
@@ -31,11 +33,12 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
 
     int oresHolded;
     public bool hasOre => oresHolded != 0;
-
-    public bool IsLocal => isLocal;
+    
     public bool isLocal;
 
     private bool canRespawn = true;
+    private bool DetectCollisions = true;
+    private bool isFreezed = false;
 
     private bool isCrouching,isProning;
 
@@ -44,8 +47,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     private float heightCollider;
 
     private float baseWalkSpeed, baseSprintSpeed;
-
-
+    
     float verticalLookRotation;
     bool grounded;
     Vector3 smoothMoveVelocity;
@@ -67,6 +69,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     Renderer[] visuals;
     
     int team;
+    int ID;
 
     public bool PlayerOnlyLook;
 
@@ -74,9 +77,12 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     public float currentHealth = maxHealth;
 
     private SingleShot singleshot;
+    private Grenade grenade;
     
     public Chat chat;
-    
+
+    public GameObject launchbutton;
+
     
     void Awake()
     {
@@ -89,20 +95,17 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         heightCollider = capsuleCollider.height;
         capsuleColliderCenter = capsuleCollider.center;
         capsuleColliderDirection = capsuleCollider.direction;
-        
+
         //playerManager = PhotonView.Find((int)Phv.InstantiationData[0]).GetComponent<PlayerManager>();
 
-        if (!PlayerManager.players.Contains(this)) PlayerManager.players.Add(this);
-
-
+        if (!PlayerManager.players.Contains(this)) 
+            PlayerManager.players.Add(this);
+        
 
         // playerController is instantiated on each machine in the room. 
         // by doing this, it will locally, on each machine in the room 
         // (PhotonNetwork.Instantiate() creates the object for all machines)
         // add the object to the players. 
-
-        // just have to test it out, but it SHOULD work
-
 
         // DEBUG
         /*Debug.Log("Displaying PlayerManager.players on machine of player "+name+":");
@@ -131,10 +134,12 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
                 //Debug.Log("Name " + items[itemIndex].name);
                 //Debug.Log(singleshot.nbballes + " :::: " + singleshot.nbinit);
             }
+            
 
             visuals = GetComponentsInChildren<Renderer>();
             team = (int) PhotonNetwork.LocalPlayer.CustomProperties["Team"];
             Debug.Log("Instantiation is finished");
+            GameManager.instance.currentweapon = 0;
         }
         else
         {
@@ -143,11 +148,21 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
             Destroy(GetComponentInChildren<Camera>().gameObject);
             Destroy(rb);
         }
+
+        Debug.Log("IsMasterClient " + PhotonNetwork.IsMasterClient +" IsLobby : " + GameManager.instance.IsLobby );
+
+        if (PhotonNetwork.IsMasterClient && GameManager.instance.IsLobby)
+        {
+            Debug.Log("Set Active is True");
+            GameManager.instance.settingsbutton.SetActive(true);
+            launchbutton.SetActive(true);
+        }
     }
 
 
     void Update()
     {
+        
         //Debug.Log(PauseMenu.GameIsPaused + "  <>  " + Phv.IsMine );
         if (!Phv.IsMine || PauseMenu.GameIsPaused)
             return;
@@ -163,8 +178,9 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         Jump();
         CheckCrouchProne();
 
-        for (int i = 0; i < items.Length; i++)
+        for (int i = 0; i < items.Count; i++)
         {
+            //Debug.Log("Items count : " + items.Count);
             if (Input.GetKeyDown((i + 1).ToString()))
             {
                 EquipItem(i);
@@ -174,7 +190,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
 
         if (Input.GetAxisRaw("Mouse ScrollWheel") < 0f)
         {
-            if (itemIndex >= items.Length - 1)
+            if (itemIndex >= items.Count - 1)
             {
                 EquipItem(0);
                 Debug.Log("Equip item");
@@ -186,19 +202,29 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         }
         else if (Input.GetAxisRaw("Mouse ScrollWheel") > 0f)
         {
-            if (itemIndex <= items.Length - 1)
+            if (itemIndex <= items.Count - 1)
             {
-                EquipItem(items.Length - 1);
+                EquipItem(items.Count - 1);
             }
             else
             {
                 EquipItem(itemIndex - 1);
             }
         }
-
+        
         if (Input.GetKey(GameManager.instance.keys["Shoot"]))
+
         {
             items[itemIndex].Use();
+            if (items[itemIndex] is Grenade)
+            {
+                Debug.Log("Item index : " + itemIndex);
+                //Debug.Log("I use the grenade 2 ");
+                items.RemoveAt(itemIndex);
+                previousItemIndex = (itemIndex - 2 < 0 ? 0 : itemIndex - 2); 
+                EquipItem(itemIndex - 1);
+                Debug.Log("Item bomb ");
+            }
         }
         
 
@@ -206,22 +232,41 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         {
             Die();
         }*/
+
         if (Input.GetKeyDown(GameManager.instance.keys["Lock"]))
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
 
+
         if (Input.GetKeyDown(GameManager.instance.keys["Unlock"]))
+
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
 
+
         if (Input.GetKeyDown(GameManager.instance.keys["Reload"]))
+
         {
             StartCoroutine(singleshot.Reload(singleshot.secondsToReload));
         }
+    }
+    
+    void FixedUpdate()
+    {
+        if (PlayerOnlyLook)
+        {
+            rb.velocity = Vector3.zero;
+            // we do not want the player to move if the player stopped
+        }
+
+        if (!Phv.IsMine || PauseMenu.GameIsPaused || PlayerOnlyLook)
+            return;
+        
+        rb.MovePosition(rb.position + transform.TransformDirection(moveAmount) * Time.fixedDeltaTime);
     }
 
     /*public bool GetInputRaw(Dictionary<string, KeyCode> dict,string keycode)
@@ -271,10 +316,9 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
     void Move()
     {
         //Debug.Log("Movement activated");
+        //Debug.Log(moveDir.x + " : " + moveDir.y +" : " + moveDir.z + " ");
 
         Vector3 moveDir = CustomGetAxisRaw(GameManager.instance.keys);
-        
-        //Debug.Log(moveDir.x + " : " + moveDir.y +" : " + moveDir.z + " ");
 
         moveAmount = Vector3.SmoothDamp(moveAmount,
             moveDir * (Input.GetKey(GameManager.instance.keys["Sprint"]) ? sprintSpeed : walkSpeed),
@@ -291,6 +335,14 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         bool isRight = animator.GetBool("IsRightWalk");
         bool pressedleft = Input.GetKey(GameManager.instance.keys["Left"]);
         bool pressedright = Input.GetKey(GameManager.instance.keys["Right"]);
+        
+        bool pressedcrouch = Input.GetKey(GameManager.instance.keys["Crouch"]);
+        bool iscrouch = animator.GetBool("IsCrouch");
+        
+        bool pressedprone = Input.GetKey(GameManager.instance.keys["Prone"]);
+        bool isprone = animator.GetBool("IsProne");
+        
+        
 
         bool isDance = animator.GetBool("IsDance");
         bool presseddance = Input.GetKey(GameManager.instance.keys["Dance"]);
@@ -352,6 +404,27 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         {
             animator.SetBool("IsDance", false);
         }
+        
+        
+        if (!iscrouch && pressedcrouch)
+        {
+            animator.SetBool("IsCrouch", true);
+        }
+        if (iscrouch && !pressedcrouch)
+        {
+            animator.SetBool("IsCrouch", false);
+        }
+        
+        
+        if (!isprone && pressedprone)
+        {
+            animator.SetBool("IsProne", true);
+            
+        }
+        if (isprone && !pressedprone)
+        {
+            animator.SetBool("IsProne", false);
+        }
     }
 
     void Look()
@@ -378,6 +451,7 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
             return;
 
         itemIndex = _index;
+        GameManager.instance.currentweapon = itemIndex;
 
         items[itemIndex].itemGameObject.SetActive(true);
 
@@ -391,6 +465,10 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         {
             singleshot = (SingleShot) items[itemIndex];
             munitionsSlider.SetValue(singleshot.nbballes, singleshot.nbinit);
+        }
+        else if (items[itemIndex] is Grenade)
+        {
+            grenade = (Grenade) items[itemIndex];
         }
         else
             Debug.LogError("ERROR");
@@ -419,6 +497,20 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
         animator.SetBool("IsLeftWalk", false);
         animator.SetBool("IsRightWalk", false);
         animator.SetBool("IsDance", false);
+    }
+
+    private void SetCollisionState(bool state)
+    {
+        rb.detectCollisions = state;
+        capsuleCollider.enabled = state;
+        DetectCollisions = state;
+    }
+
+    private void SetFreezeState(bool state)
+    {
+        rb.constraints = (state ? RigidbodyConstraints.FreezeAll 
+            : RigidbodyConstraints.FreezeRotation);
+        isFreezed = state;
     }
 
     void CheckCrouchProne()
@@ -505,20 +597,6 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
 
     public int GetTeam() => team;
 
-    void FixedUpdate()
-    {
-        if (PlayerOnlyLook)
-        {
-            rb.velocity = Vector3.zero;
-            // we do not want the player to move if the player stopped
-        }
-
-        if (!Phv.IsMine || PauseMenu.GameIsPaused || PlayerOnlyLook)
-            return;
-        
-        rb.MovePosition(rb.position + transform.TransformDirection(moveAmount) * Time.fixedDeltaTime);
-    }
-
     public void TakeDamage(float damage) // juste sur le shooter
         =>
             Phv.RPC("RPC_TakeDamage", RpcTarget.All, damage);
@@ -531,8 +609,10 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
          SetRenderers(false);
 
          currentHealth = 100;
-         PlayerManager.scores[(team+1)%2] += 1;
-         PlayerManager.UpdateScores();
+         GameManager.scores[(team+1)%2] += 1;
+         //PlayerManager.UpdateScores();
+         // TODO
+         
          if (hasOre)
          {
              RemoveOres();
@@ -544,6 +624,9 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
          SendChatMessage("System",
              lastShooter.name +" killed " + name);
          
+         SetCollisionState(false);
+         SetFreezeState(true);
+         
          yield return new WaitForSeconds(respawnWait);
 
          currentHealth = 100; 
@@ -553,6 +636,9 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
          transform.position = spawn.position;
          transform.rotation = spawn.rotation;
          //GetComponent<PlayerController>().enabled = true;
+         
+         SetCollisionState(true);
+         SetFreezeState(false);
 
          SetRenderers(true);
          canRespawn = true;
@@ -570,7 +656,6 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
      {
          Phv.RPC("SendChat",RpcTarget.All,sender,message);
      }
-
 
      [PunRPC]
      void RPC_TakeDamage(float damage)
@@ -596,8 +681,15 @@ public class PlayerController : MonoBehaviourPunCallbacks, IDamageable
          {
              GameManager.chatMessages.RemoveAt(GameManager.chatMessages.Count - 1);
          }
-
          Chat.chatMessages = GameManager.chatMessages;
          // responsible for the synchronisation of all messages
+     }
+     
+     public void StartGame()
+     {
+         Debug.Log("Start Game");
+         PlayerManager.localPlayerInstance = null;
+         PhotonNetwork.LoadLevel(2) ; // index de la scene
+         
      }
 }
