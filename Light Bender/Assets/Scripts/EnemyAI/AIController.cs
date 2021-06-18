@@ -29,6 +29,10 @@ namespace EnemyAI
         private bool canRespawn = true;
 
         public float respawnTime = 5;
+
+        public int timeUntilGetHelp = 60;
+        private GameObject target;
+        private bool InSight = false;
         
         // Weapons
         [SerializeField]  Item[] items;
@@ -68,11 +72,35 @@ namespace EnemyAI
                 NextWalkPoint();
             }
 
-            (bool InSight, GameObject target) = GetTarget();
+            (InSight, target) = GetTarget();
             if (InSight)
             {
                 Attack(target);
+                agent.SetDestination(target.transform.position);
+                if (timeUntilGetHelp == 0)
+                {
+                    AICommunication.SendMessage(this);
+                    timeUntilGetHelp = 60;
+                }
+                
             }
+            else
+            {
+                AIController needsHelp;
+                if (team == 0)
+                    needsHelp = AICommunication.NeedsHelpBlue;
+                else
+                {
+                    needsHelp = AICommunication.NeedsHelpRed;
+                }
+                
+                if (needsHelp != null)
+                {
+                    agent.SetDestination(needsHelp.transform.position);
+                }
+            }
+
+            timeUntilGetHelp -= 1;
         }
 
         (bool, GameObject) GetTarget()

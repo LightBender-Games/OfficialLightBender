@@ -180,6 +180,7 @@ MonoBehaviour:
   currentHealth: 100
   lastShooter: {fileID: 0}
   respawnTime: 5
+  timeUntilGetHelp: 60
   items:
   - {fileID: 6620249896316005263}
   team: 1
